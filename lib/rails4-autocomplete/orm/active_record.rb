@@ -41,7 +41,26 @@ module Rails4Autocomplete
         term = term.gsub(/([_%\\])/, '\\\\\1')
         is_full_search = options[:full]
         like_clause = (postgres?(model) ? 'ILIKE' : 'LIKE')
-        ["LOWER(#{options[:table_name]}.#{method}) #{like_clause} ?", "#{(is_full_search ? '%' : '')}#{term.downcase}%"]
+        term_clause = ["#{(is_full_search ? '%' : '')}#{term.downcase}%"]
+        if (search_params = options[:search_params])
+          search_param = []
+          search_params.each do |param|
+            search_param << get_autocomplete_like_clause(get_autocomplete_search_param(table_name, param), like_clause)
+          end
+          term_clause = term_clause * search_params.count
+          search_param = search_param.join(' OR ')
+        else
+          search_param = get_autocomplete_like_clause(get_autocomplete_search_param(table_name, method), like_clause)
+        end
+        [search_param].concat(term_clause)
+      end
+
+      def get_autocomplete_search_param(table, param)
+        "#{table}.#{param}"
+      end
+
+      def get_autocomplete_like_clause(param, like_clause)
+        "LOWER(#{param}) #{like_clause} ?"
       end
 
       def postgres?(model)
